@@ -2,14 +2,28 @@
 #include <stdio.h>
 #include <assert.h>
 #include <math.h>
+#include <vector>
 #include "common.h"
+
+using namespace std;
+
+#define density 0.0005
+#define mass    0.01
+#define cutoff  0.01
+#define min_r   (cutoff/100)
+#define dt      0.0005
+
+// calculate particle's bin number
+int binNum(particle_t &p, int bpr) {
+  return (floor(p.x / cutoff) + bpr * floor(p.y / cutoff));
+}
 
 //
 //  benchmarking program
 //
 int main(int argc, char **argv) {
   int navg, nabsavg = 0;
-  double davg, dmin, absmin = 1.0, absavg = 0.0;
+  double dmin, davg, absmin = 1.0, absavg = 0.0;
 
   if (find_option(argc, argv, "-h") >= 0) {
     printf("Options:\n");
@@ -33,43 +47,69 @@ int main(int argc, char **argv) {
   set_size(n);
   init_particles(n, particles);
 
+
+  double size = sqrt(density * n);
+  int bpr = ceil(size / cutoff);
+  int numbins = bpr * bpr;
+  vector < particle_t * > *bins = new vector<particle_t *>[numbins];
+
   //
   //  simulate a number of time steps
   //
   double simulation_time = read_timer();
-
   for (int step = 0; step < NSTEPS; step++) {
     navg = 0;
     davg = 0.0;
     dmin = 1.0;
-    //
-    //  compute forces
-    //
-    for (int i = 0; i < n; i++) {
-      particles[i].ax = particles[i].ay = 0;
-      for (int j = 0; j < n; j++)
-        apply_force(particles[i], particles[j], &dmin, &davg, &navg);
+
+    // reset each vector at each bin
+    for (int m = 0; m < numbins; m++)
+      bins[m].clear();
+
+    // Putting particles on 2d bins
+    for (int i = 0; i < n; i++)
+      bins[binNum(particles[i], bpr)].push_back(particles + i);
+
+
+    for (int p = 0; p < n; p++) {
+      // Set the acceleration to 0 at each timestep
+      particles[p].ax = particles[p].ay = 0;
+
+      // check the neighbor bins
+      int cbin = binNum(particles[p], bpr);
+      int lowi = -1, highi = 1, lowj = -1, highj = 1;
+      if (cbin < bpr)
+        lowj = 0;
+      if (cbin % bpr == 0)
+        lowi = 0;
+      if (cbin % bpr == (bpr - 1))
+        highi = 0;
+      if (cbin >= bpr * (bpr - 1))
+        highj = 0;
+
+      // 2 loops, for the neighbor bins
+      for (int i = lowi; i <= highi; i++)
+        for (int j = lowj; j <= highj; j++) {
+          int nbin = cbin + i + bpr * j;
+          // loop all particles in the bin
+          for (int k = 0; k < bins[nbin].size(); k++)
+            apply_force(particles[p], *bins[nbin][k], &dmin, &davg, &navg);
+        }
     }
 
-    //
-    //  move particles
-    //
-    for (int i = 0; i < n; i++)
-      move(particles[i]);
+
+    for (int p = 0; p < n; p++)
+      move(particles[p]);
 
     if (find_option(argc, argv, "-no") == -1) {
-      //
-      // Computing statistical data
-      //
+
       if (navg) {
         absavg += davg / navg;
         nabsavg++;
       }
       if (dmin < absmin) absmin = dmin;
 
-      //
-      //  save if necessary
-      //
+
       if (fsave && (step % SAVEFREQ) == 0)
         save(fsave, n, particles);
     }
@@ -80,7 +120,7 @@ int main(int argc, char **argv) {
 
   if (find_option(argc, argv, "-no") == -1) {
     if (nabsavg) absavg /= nabsavg;
-    // 
+    //
     //  -the minimum distance absmin between 2 particles during the run of the simulation
     //  -A Correct simulation will have particles stay at greater than 0.4 (of cutoff) with typical values between .7-.8
     //  -A simulation were particles don't interact correctly will be less than 0.4 (of cutoff) with typical values between .01-.05
@@ -105,6 +145,7 @@ int main(int argc, char **argv) {
   if (fsum)
     fclose(fsum);
   free(particles);
+  delete[] bins;
   if (fsave)
     fclose(fsave);
 
