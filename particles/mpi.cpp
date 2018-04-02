@@ -21,30 +21,6 @@ using std::set;
 int bin_counts;
 double grid_size, bin_size;
 
-inline void compute_force_in_eache_bins(vector<bin_t> &bins, int i, int j, double &dmin, double &davg, int &navg) {
-  bin_t &vec = bins[i * bin_counts + j];
-
-  int k = 0;
-  while (k < vec.size()){
-    vec[k].ax = vec[k].ay = 0;
-
-    k++;
-  }
-
-  int dx = -1;
-  while(dx <= 1){
-    for (int dy = -1; dy <= 1; dy++) {
-      if (i + dx >= 0 && i + dx < bin_counts && j + dy >= 0 && j + dy < bin_counts) {
-        bin_t &vec2 = bins[(i + dx) * bin_counts + j + dy];
-        for (int k = 0; k < vec.size(); k++)
-          for (int l = 0; l < vec2.size(); l++)
-            apply_force(vec[k], vec2[l], &dmin, &davg, &navg);
-      }
-    }
-    dx++;
-  }
-}
-
 inline void create_bins(vector<bin_t> &bins, particle_t *particles, int n) {
   grid_size = sqrt(n * _density);
   bin_size = _cutoff;
@@ -69,20 +45,29 @@ void push_particles_in_bin(particle_t &particle, vector<bin_t> &bins) {
   bins[x * bin_counts + y].push_back(particle);
 }
 
+inline void compute_force_in_eache_bins(vector<bin_t> &bins, int i, int j, double &dmin, double &davg, int &navg) {
+  bin_t &vec = bins[i * bin_counts + j];
 
-inline void calculate_neighbor_particles(int i, int j, vector<int> &neighbors) {
-  for (int dx = -1; dx <= 1; dx++) {
+  int k = 0;
+  while (k < vec.size()){
+    vec[k].ax = vec[k].ay = 0;
+
+    k++;
+  }
+
+  int dx = -1;
+  while(dx <= 1){
     for (int dy = -1; dy <= 1; dy++) {
-      if (dx == 0 && dy == 0)
-        continue;
       if (i + dx >= 0 && i + dx < bin_counts && j + dy >= 0 && j + dy < bin_counts) {
-        int index = (i + dx) * bin_counts + j + dy;
-        neighbors.push_back(index);
+        bin_t &vec2 = bins[(i + dx) * bin_counts + j + dy];
+        for (int k = 0; k < vec.size(); k++)
+          for (int l = 0; l < vec2.size(); l++)
+            apply_force(vec[k], vec2[l], &dmin, &davg, &navg);
       }
     }
+    dx++;
   }
 }
-
 
 //
 //  benchmarking program
@@ -171,11 +156,6 @@ int main(int argc, char **argv) {
       }
       ++i;
     }
-//    for (int i = start_own_bins; i < end_own_bins; ++i) {
-//      for (int j = 0; j < bin_counts; ++j) {
-//        compute_force_in_eache_bins(bins, i, j, dmin, davg, navg);
-//      }
-//    }
 
     if (find_option(argc, argv, "-no") == -1) {
       MPI_Reduce(&davg, &rdavg, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
@@ -191,7 +171,6 @@ int main(int argc, char **argv) {
       }
     }
 
-    // move, but not rebin
     bin_t move_locally;
     bin_t move_remotely;
 
@@ -222,30 +201,6 @@ int main(int argc, char **argv) {
       }
       m++;
     }
-
-//    for (int i = start_own_bins; i < end_own_bins; ++i) {
-//      for (int j = 0; j < bin_counts; ++j) {
-//        bin_t &bin = bins[i * bin_counts + j];
-//        int tail = bin.size(), k = 0;
-//        for (; k < tail;) {
-//          move(bin[k]);
-//          int x = int(bin[k].x / bin_size);
-//          int y = int(bin[k].y / bin_size);
-//          if (start_own_bins <= x && x < end_own_bins) {
-//            if (x == i && y == j)
-//              ++k;
-//            else {
-//              move_locally.push_back(bin[k]);
-//              bin[k] = bin[--tail];
-//            }
-//          } else {
-//            move_remotely.push_back(bin[k]);
-//            bin[k] = bin[--tail];
-//          }
-//        }
-//        bin.resize(k);
-//      }
-//    }
 
     for (int i = 0; i < move_locally.size(); ++i) {
       push_particles_in_bin(move_locally[i], bins);
@@ -296,9 +251,7 @@ int main(int argc, char **argv) {
 
         ++i;
       }
-//      for (int i = 1; i < n_proc; ++i) {
-//        displace[i] = displace[i - 1] + receive_count[i - 1];
-//      }
+
       total_count = receive_count[n_proc - 1] + displace[n_proc - 1];
       move_increment.resize(total_count);
     }
@@ -315,9 +268,6 @@ int main(int argc, char **argv) {
     if (rank == 0) {
       for (int i = 0; i < move_increment.size(); ++i) {
         int x = int(move_increment[i].x / bin_size);
-
-//        assert(move_increment[i].x >= 0 && move_increment[i].y >= 0 &&
-//               move_increment[i].x <= grid_size && move_increment[i].y <= grid_size);
 
         int particle_id = min(x / num_bins_per_process, n_proc - 1);
         particles_positions[particle_id].push_back(move_increment[i]);
@@ -336,9 +286,6 @@ int main(int argc, char **argv) {
 
         ++i;
       }
-//      for (int i = 0; i < n_proc; ++i) {
-//        receive_count[i] = particles_positions[i].size();
-//      }
 
       displace[0] = 0;
       int j = 1;
@@ -348,9 +295,6 @@ int main(int argc, char **argv) {
         ++j;
 
       }
-//      for (int i = 1; i < n_proc; ++i) {
-//        displace[i] = displace[i - 1] + receive_count[i - 1];
-//      }
     }
     send_count = 0;
     MPI_Scatter(receive_count, 1, MPI_INT, &send_count, 1, MPI_INT, 0, MPI_COMM_WORLD);
@@ -375,11 +319,7 @@ int main(int argc, char **argv) {
 
       ++l;
     }
-//    for (int i = 0; i < send_count; ++i) {
-//      particle_t &p = move_reduction[i];
-//      assert(p.x >= 0 && p.y >= 0 && p.x <= grid_size && p.y <= grid_size);
-//      push_particles_in_bin(p, bins);
-//    }
+
     }
     simulation_time = read_timer() - simulation_time;
 
