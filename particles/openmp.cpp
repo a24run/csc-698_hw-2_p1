@@ -125,34 +125,37 @@ int main( int argc, char **argv )
             bin_t& clean = temp[threadId];
             clean.clear();
             #pragma omp for
-            int i = 0, j = 0;
-            while(i < binNumber)
             {
-                while(j < binNumber)
+                int i = 0, j = 0;
+                while(i < binNumber)
                 {
-                    bin_t& vec = particleBin[i * binNumber + j];
-                    int tailRec = vec.size();
-                    int k = 0;
-                    for(;k < tailRec;)
+                    while(j < binNumber)
                     {
-                        move(vec[k]);
-                        int x = int(vec[k].x / bin);
-                        int y = int(vec[k].y / bin);
-                        if(x == i && y == j)
+                        bin_t& vec = particleBin[i * binNumber + j];
+                        int tailRec = vec.size();
+                        int k = 0;
+                        for(;k < tailRec;)
                         {
-                            k++;
+                            move(vec[k]);
+                            int x = int(vec[k].x / bin);
+                            int y = int(vec[k].y / bin);
+                            if(x == i && y == j)
+                            {
+                                k++;
+                            }
+                            else
+                            {
+                                clean.push_back(vec[k]);
+                                vec[k] = vec[--tailRec];
+                            }
                         }
-                        else
-                        {
-                            clean.push_back(vec[k]);
-                            vec[k] = vec[--tailRec];
-                        }
+                        vec.resize(k);
+                        j++;
                     }
-                    vec.resize(k);
-                    j++;
+                    i++;
                 }
-                i++;
             }
+
             #pragma omp master
             {
                 int i = 0, j = 0;
