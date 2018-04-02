@@ -20,9 +20,9 @@ void buildBin(vector<bin_t>& bins, particle_t* particle, int j)
     bins.resize(binNumber * binNumber);
     for(int i = 0; i < j; i++)
     {
-        int xPos = int(particle[i].x / bin);
-        int yPos = int(particle[i].y / bin);
-        bins[xPos * binNumber + y].push_back(particle[i]);
+        int x = int(particle[i].x / bin);
+        int y = int(particle[i].y / bin);
+        bins[x * binNumber + y].push_back(particle[i]);
     }
 }
 
@@ -53,10 +53,14 @@ int main( int argc, char **argv )
     FILE *fsum = sumname ? fopen ( sumname, "a" ) : NULL;      
 
     particle_t *particles = (particle_t*) malloc( n * sizeof(particle_t) );
+
     set_size( n );
     init_particles( n, particles );
 
-    vector<bin_t> particleBin, temp;
+    vector<bin_t> particleBin;
+    vector<bin_t> temp;
+
+    buildBin(particleBin, particles, n);
 
     //
     //  simulate a number of time steps
@@ -138,6 +142,7 @@ int main( int argc, char **argv )
                         else
                         {
                             clean.push_back(vec[k]);
+                            vec[k] = vec[--tailRec];
                         }
                     }
                     vec.resize(k);
