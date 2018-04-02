@@ -125,34 +125,29 @@ int main( int argc, char **argv )
             bin_t& clean = temp[threadId];
             clean.clear();
             #pragma omp for
+            for(int i = 0; i < binNumber; i++)
             {
-                int i = 0, j = 0;
-                while(i < binNumber)
+                for(int j = 0; j < binNumber; j++)
                 {
-                    while(j < binNumber)
+                    bin_t& vec = particleBin[i * binNumber + j];
+                    int tailRec = vec.size();
+                    int k = 0;
+                    for(;k < tailRec;)
                     {
-                        bin_t& vec = particleBin[i * binNumber + j];
-                        int tailRec = vec.size();
-                        int k = 0;
-                        for(;k < tailRec;)
+                        move(vec[k]);
+                        int x = int(vec[k].x / bin);
+                        int y = int(vec[k].y / bin);
+                        if(x == i && y == j)
                         {
-                            move(vec[k]);
-                            int x = int(vec[k].x / bin);
-                            int y = int(vec[k].y / bin);
-                            if(x == i && y == j)
-                            {
-                                k++;
-                            }
-                            else
-                            {
-                                clean.push_back(vec[k]);
-                                vec[k] = vec[--tailRec];
-                            }
+                            k++;
                         }
-                        vec.resize(k);
-                        j++;
+                        else
+                        {
+                            clean.push_back(vec[k]);
+                            vec[k] = vec[--tailRec];
+                        }
                     }
-                    i++;
+                    vec.resize(k);
                 }
             }
 
