@@ -19,7 +19,7 @@ using std::set;
 #define _density 0.0005
 
 int bin_counts;
-double grid_size, bin_size, ;
+double grid_size, bin_size;
 
 inline void compute_force_in_eache_bins(vector<bin_t> &bins, int i, int j, double &dmin, double &davg, int &navg) {
   bin_t &vec = bins[i * bin_counts + j];
