@@ -18,11 +18,13 @@ void buildBin(vector<bin_t>& bins, particle_t* particle, int j)
     bin = _cutoff * 2;
     binNumber = int(grid/bin) + 1;
     bins.resize(binNumber * binNumber);
-    for(int i = 0; i < j; i++)
+    int i = 0;
+    while(i < j)
     {
         int x = int(particle[i].x / bin);
         int y = int(particle[i].y / bin);
         bins[x * binNumber + y].push_back(particle[i]);
+        i++;
     }
 }
 
@@ -74,8 +76,8 @@ int main( int argc, char **argv )
             numthreads = omp_get_num_threads();
             temp.resize(numthreads);
         };
-
-        for( int step = 0; step < 1000; step++ )
+        int step = 0;
+        while(step < 1000)
         {
             navg = 0;
             davg = 0.0;
@@ -123,9 +125,10 @@ int main( int argc, char **argv )
             bin_t& clean = temp[threadId];
             clean.clear();
             #pragma omp for
-            for(int i = 0; i < binNumber; i++ )
+            int i = 0, j = 0;
+            while(i < binNumber)
             {
-                for(int j = 0; j < binNumber; j++)
+                while(j < binNumber)
                 {
                     bin_t& vec = particleBin[i * binNumber + j];
                     int tailRec = vec.size();
@@ -146,7 +149,9 @@ int main( int argc, char **argv )
                         }
                     }
                     vec.resize(k);
+                    j++;
                 }
+                i++;
             }
             #pragma omp master
             {
@@ -187,6 +192,7 @@ int main( int argc, char **argv )
                      save( fsave, n, particles );
             }
             #pragma omp barrier
+            step++;
         }
 }
     simulation_time = read_timer( ) - simulation_time;
