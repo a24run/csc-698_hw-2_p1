@@ -150,15 +150,18 @@ int main( int argc, char **argv )
             }
             #pragma omp master
             {
-                for(int i = 0; i < numthreads; i++)
+                int i = 0, j = 0;
+                while(i < numthreads)
                 {
                     bin_t& temp2 = temp[i];
-                    for(int j = 0; j < temp2.size(); j++)
+                    while(j < temp2.size())
                     {
                         int x = int(temp2[j].x / bin);
                         int y = int(temp2[j].y / bin);
                         particleBin[x * binNumber + y].push_back(temp2[j]);
+                        j++;
                     }
+                    i++;
                 }
             }
 
