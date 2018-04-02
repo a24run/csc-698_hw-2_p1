@@ -21,7 +21,7 @@ using std::set;
 double binSize, gridSize;
 int binCount;
 
-inline void force_compute_fo_bins(vector<bin_t> &bins, int i, int j, double &dmin, double &davg, int &navg) {
+inline void force_compute_for_bins(vector<bin_t> &bins, int i, int j, double &dmin, double &davg, int &navg) {
   bin_t &vec = bins[i * binCount + j];
 
   int k = 0;
@@ -31,12 +31,8 @@ inline void force_compute_fo_bins(vector<bin_t> &bins, int i, int j, double &dmi
     k++;
   }
 
-//  for (int k = 0; k < vec.size(); k++)
-//    vec[k].ax = vec[k].ay = 0;
-
   int dx = -1;
   while(dx <= 1){
-
     for (int dy = -1; dy <= 1; dy++) {
       if (i + dx >= 0 && i + dx < binCount && j + dy >= 0 && j + dy < binCount) {
         bin_t &vec2 = bins[(i + dx) * binCount + j + dy];
@@ -47,19 +43,6 @@ inline void force_compute_fo_bins(vector<bin_t> &bins, int i, int j, double &dmi
     }
     dx++;
   }
-
-
-//  for (int dx = -1; dx <= 1; dx++)
-//  {
-//    for (int dy = -1; dy <= 1; dy++) {
-//      if (i + dx >= 0 && i + dx < binCount && j + dy >= 0 && j + dy < binCount) {
-//        bin_t &vec2 = bins[(i + dx) * binCount + j + dy];
-//        for (int k = 0; k < vec.size(); k++)
-//          for (int l = 0; l < vec2.size(); l++)
-//            apply_force(vec[k], vec2[l], &dmin, &davg, &navg);
-//      }
-//    }
-//  }
 }
 
 inline void create_bins(vector<bin_t> &bins, particle_t *particles, int n) {
@@ -77,12 +60,6 @@ inline void create_bins(vector<bin_t> &bins, particle_t *particles, int n) {
 
     i++;
   }
-//
-//  for (int i = 0; i < n; i++) {
-//    int x = int(particles[i].x / binSize);
-//    int y = int(particles[i].y / binSize);
-//    bins[x * binCount + y].push_back(particles[i]);
-//  }
 }
 
 void push_particles_in_bin(particle_t &particle, vector<bin_t> &bins) {
@@ -193,7 +170,7 @@ int main(int argc, char **argv) {
     // compute local forces
     for (int i = my_bins_start; i < my_bins_end; ++i) {
       for (int j = 0; j < binCount; ++j) {
-        force_compute_fo_bins(bins, i, j, dmin, davg, navg);
+        force_compute_for_bins(bins, i, j, dmin, davg, navg);
       }
     }
 
