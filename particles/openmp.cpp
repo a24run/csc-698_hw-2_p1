@@ -4,6 +4,27 @@
 #include <math.h>
 #include "common.h"
 #include "omp.h"
+#include <vector>
+using namespace std;
+
+#define _cutoff 0.01
+#define _density 0.0005
+double bin, grid;
+int binNumber;
+
+void buildBin(vector<bin_t>& bins, particle_t* particle, int j)
+{
+    grid = sqrt(n*_density);
+    bin = _cutoff * 2;
+    binNumber = int(grid/bin) + 1;
+    bins.resize(binNumber * binNumber);
+    for(int i = 0; i < j; i++)
+    {
+        int xPos = int(particle[i].x / bin);
+        int yPos = int(particle[i].y / bin);
+        bins[xPos * binNumber + y].push_back(particle[i]);
+    }
+}
 
 //
 //  benchmarking program
@@ -35,6 +56,8 @@ int main( int argc, char **argv )
     set_size( n );
     init_particles( n, particles );
 
+    vector<bin_t> particleBin, temp;
+
     //
     //  simulate a number of time steps
     //
@@ -42,53 +65,121 @@ int main( int argc, char **argv )
 
     #pragma omp parallel private(dmin) 
     {
-    numthreads = omp_get_num_threads();
-    for( int step = 0; step < 1000; step++ )
-    {
-        navg = 0;
-        davg = 0.0;
-	dmin = 1.0;
-        //
-        //  compute all forces
-        //
-        #pragma omp for reduction (+:navg) reduction(+:davg)
-        for( int i = 0; i < n; i++ )
+        #pragma omp master
         {
-            particles[i].ax = particles[i].ay = 0;
-            for (int j = 0; j < n; j++ )
-                apply_force( particles[i], particles[j],&dmin,&davg,&navg);
-        }
-        
-		
-        //
-        //  move particles
-        //
-        #pragma omp for
-        for( int i = 0; i < n; i++ ) 
-            move( particles[i] );
-  
-        if( find_option( argc, argv, "-no" ) == -1 ) 
-        {
-          //
-          //  compute statistical data
-          //
-          #pragma omp master
-          if (navg) { 
-            absavg += davg/navg;
-            nabsavg++;
-          }
+            numthreads = omp_get_num_threads();
+            temp.resize(numthreads);
+        };
 
-          #pragma omp critical
-	  if (dmin < absmin) absmin = dmin; 
-		
-          //
-          //  save if necessary
-          //
-          #pragma omp master
-          if( fsave && (step%SAVEFREQ) == 0 )
-              save( fsave, n, particles );
+        for( int step = 0; step < 1000; step++ )
+        {
+            navg = 0;
+            davg = 0.0;
+            dmin = 1.0;
+            //
+            //  compute all forces
+            //
+            #pragma omp for reduction (+:navg) reduction(+:davg)
+            for( int i = 0; i < binNumber; i++ )
+            {
+                for (int j = 0; j < binNumber; j++ )
+                {
+                    bin_t& vecBin = particleBin[i * binNumber + j];
+
+                    for(int k = 0; k < vecBin.size(); k++)
+                    {
+                        vecBin[k].ax = vecBin[k].ay = 0.0;
+                    }
+
+                    for(int bx = -1; bx <= 1; bx++)
+                    {
+                        for(int by = -1; by <= 1; by++)
+                        {
+                            if(i + bx >= 0 && i + bx < binNumber && j + by >= 0 && j + by < binNumber)
+                            {
+                                bin_t& vect = particleBin[(i + bx) * binNumber + j + by];
+                                for(int l = 0; l < vect.size(); l++)
+                                {
+                                    for(int m = 0; m < vect.size(); m++)
+                                    {
+                                        apply_force(vecBin[k], vect[m], &dmin, &davg, &navg);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+
+            //
+            //  move particles
+            //
+            int threadId = omp_get_thread_num();
+            bin_t& clean = clean[threadId];
+            clean.clear();
+            #pragma omp for
+            for(int i = 0; i < binNumber; i++ )
+            {
+                for(int j = 0; j < binNumber; j++)
+                {
+                    bin_t& vec = particleBin[i * binNumber + j];
+                    int tailRec = vec.size();
+                    int k = 0;
+                    for(;k < tailRec;)
+                    {
+                        move(vec[k]);
+                        int x = int(vec[k].x / bin);
+                        int y = int(vec[k].y / bin);
+                        if(x == i && y == j)
+                        {
+                            k++;
+                        }
+                        else
+                        {
+                            clean.push_back(vec[k]);
+                        }
+                    }
+                    vec.resize(k);
+                }
+            }
+            #pragma omp master
+            {
+                for(int i = 0; i < numthreads; i++)
+                {
+                    bin_t& temp2 = temp[i];
+                    for(int j = 0; j < temp2.size(); j++)
+                    {
+                        int x = int(temp2[j].x / bin);
+                        int y = int(temp2[j].y / bin);
+                        particleBin[x * binNumber + y].push_back(temp2[j]);
+                    }
+                }
+            }
+
+            if( find_option( argc, argv, "-no" ) == -1 )
+            {
+                 //
+                 //  compute statistical data
+                 //
+                 #pragma omp master
+                 if (navg) {
+                   absavg += davg/navg;
+                   nabsavg++;
+                 }
+
+                 #pragma omp critical
+                 if (dmin < absmin) absmin = dmin;
+
+                  //
+                  //  save if necessary
+                  //
+                 #pragma omp master
+                 if( fsave && (step%SAVEFREQ) == 0 )
+                     save( fsave, n, particles );
+            }
+            #pragma omp barrier
         }
-    }
 }
     simulation_time = read_timer( ) - simulation_time;
     
