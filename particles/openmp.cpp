@@ -14,7 +14,7 @@ int binNumber;
 
 void buildBin(vector<bin_t>& bins, particle_t* particle, int j)
 {
-    grid = sqrt(n*_density);
+    grid = sqrt(j * _density);
     bin = _cutoff * 2;
     binNumber = int(grid/bin) + 1;
     bins.resize(binNumber * binNumber);
@@ -106,7 +106,7 @@ int main( int argc, char **argv )
                                 {
                                     for(int m = 0; m < vect.size(); m++)
                                     {
-                                        apply_force(vecBin[k], vect[m], &dmin, &davg, &navg);
+                                        apply_force(vecBin[l], vect[m], &dmin, &davg, &navg);
                                     }
                                 }
                             }
@@ -120,7 +120,7 @@ int main( int argc, char **argv )
             //  move particles
             //
             int threadId = omp_get_thread_num();
-            bin_t& clean = clean[threadId];
+            bin_t& clean = temp[threadId];
             clean.clear();
             #pragma omp for
             for(int i = 0; i < binNumber; i++ )
